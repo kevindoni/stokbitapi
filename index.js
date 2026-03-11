@@ -714,10 +714,11 @@ app.use(helmet());
 app.use((req, res, next) => {
   runtimeMetrics.requestCount += 1;
   const start = Date.now();
-  res.on("finish", () => {
-    const durationMs = Date.now() - start;
-    res.setHeader("X-Response-Time-Ms", String(durationMs));
-  });
+  const origWriteHead = res.writeHead.bind(res);
+  res.writeHead = function (statusCode, ...args) {
+    res.setHeader("X-Response-Time-Ms", String(Date.now() - start));
+    return origWriteHead(statusCode, ...args);
+  };
   next();
 });
 
