@@ -206,6 +206,38 @@ function safeJson(response) {
   return response.json();
 }
 
+function humanizeError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("failed to fetch")) {
+    return "Koneksi ke API terputus. Coba refresh sebentar lagi.";
+  }
+  if (message.includes("http 429")) {
+    return "Terlalu banyak request. Tunggu beberapa detik lalu coba lagi.";
+  }
+  if (message.includes("http 5")) {
+    return "Server analitik sedang sibuk. Coba ulang dalam beberapa detik.";
+  }
+  return error?.message || "Terjadi kesalahan yang tidak diketahui.";
+}
+
+async function apiGet(path, retries = 1) {
+  let lastError;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetch(`${API}${path}`, {
+        signal: AbortSignal.timeout(12000),
+      });
+      return await safeJson(response);
+    } catch (error) {
+      lastError = error;
+      if (i < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 350 * (i + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 function showPage(name) {
   document
     .querySelectorAll(".page")
@@ -247,9 +279,9 @@ function fmtUptime(seconds) {
 async function checkStatus() {
   try {
     const [health, metrics, auth] = await Promise.all([
-      fetch(`${API}/health`).then(safeJson),
-      fetch(`${API}/metrics`).then(safeJson),
-      fetch(`${API}/auth/status`).then(safeJson),
+      apiGet(`/health`, 1),
+      apiGet(`/metrics`, 1),
+      apiGet(`/auth/status`, 1),
     ]);
 
     document.getElementById("server-status").textContent = "Live";
@@ -268,9 +300,7 @@ async function fetchTopIdeas() {
   if (!container) return;
 
   try {
-    const sector = await fetch(`${API}/analysis/sector-heatmap/lq45`).then(
-      safeJson,
-    );
+    const sector = await apiGet(`/analysis/sector-heatmap/lq45`, 1);
     const picks = (sector.heatmap || []).slice(0, 6);
 
     if (!picks.length) {
@@ -355,15 +385,14 @@ async function fetchTopIdeas() {
       );
     });
   } catch (error) {
-    container.innerHTML = `<div class="red">Gagal memuat ide saham: ${error.message}</div>`;
+    container.innerHTML = `<div class="red">Gagal memuat ide saham: ${humanizeError(error)}</div>`;
   }
 }
 
 function renderStatCards(health, metrics, auth) {
   const container = document.getElementById("stat-cards");
 
-  fetch(`${API}/market/summary`)
-    .then(safeJson)
+  apiGet(`/market/summary`, 1)
     .then((market) => {
       const ihsg = market?.COMPOSITE || market?.data || {};
       const close = ihsg?.close || ihsg?.last_price || "-";
@@ -503,9 +532,9 @@ async function fetchQuote(explicitSymbol) {
 
   try {
     const [quoteRes, techRes, fundRes] = await Promise.all([
-      fetch(`${API}/quote/${symbol}`).then(safeJson),
-      fetch(`${API}/analysis/technicals/${symbol}`).then(safeJson),
-      fetch(`${API}/analysis/fundamentals/${symbol}`).then(safeJson),
+      apiGet(`/quote/${symbol}`, 1),
+      apiGet(`/analysis/technicals/${symbol}`, 1),
+      apiGet(`/analysis/fundamentals/${symbol}`, 1),
     ]);
 
     const price =
@@ -585,7 +614,7 @@ async function fetchQuote(explicitSymbol) {
       </div>
     `;
   } catch (error) {
-    element.innerHTML = `<div class="card"><div class="red">Gagal memuat data: ${error.message}</div></div>`;
+    element.innerHTML = `<div class="card"><div class="red">Gagal memuat data: ${humanizeError(error)}</div></div>`;
   }
 }
 
@@ -603,9 +632,9 @@ async function fetchAnalysis(explicitSymbol) {
 
   try {
     const [techRes, fundRes, compRes, divRes, perfRes] = await Promise.all([
-      fetch(`${API}/analysis/technicals/${symbol}`).then(safeJson),
-      fetch(`${API}/analysis/fundamentals/${symbol}`).then(safeJson),
-      fetch(`${API}/analysis/company/${symbol}`).then(safeJson),
+      apiGet(`/analysis/technicals/${symbol}`, 1),
+      apiGet(`/analysis/fundamentals/${symbol}`, 1),
+      apiGet(`/analysis/company/${symbol}`, 1),
       fetch(`${API}/analysis/dividends/${symbol}`)
         .then((res) => res.json())
         .catch(() => ({})),
@@ -656,7 +685,7 @@ async function fetchAnalysis(explicitSymbol) {
       </div>
     `;
   } catch (error) {
-    element.innerHTML = `<div class="card"><div class="red">Gagal analisis: ${error.message}</div></div>`;
+    element.innerHTML = `<div class="card"><div class="red">Gagal analisis: ${humanizeError(error)}</div></div>`;
   }
 }
 
@@ -672,9 +701,7 @@ async function fetchSector(sector, pill) {
   element.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Memuat heatmap sektor ${sector.toUpperCase()}...</div></div>`;
 
   try {
-    const data = await fetch(`${API}/analysis/sector-heatmap/${sector}`).then(
-      safeJson,
-    );
+    const data = await apiGet(`/analysis/sector-heatmap/${sector}`, 1);
     const avg = parseFloat(data.sector_avg_change) || 0;
     const avgClass = avg >= 0 ? "green" : "red";
     const heatCells = (data.heatmap || [])
@@ -710,7 +737,7 @@ async function fetchSector(sector, pill) {
       );
     });
   } catch (error) {
-    element.innerHTML = `<div class="card"><div class="red">Gagal memuat heatmap: ${error.message}</div></div>`;
+    element.innerHTML = `<div class="card"><div class="red">Gagal memuat heatmap: ${humanizeError(error)}</div></div>`;
   }
 }
 
@@ -726,9 +753,10 @@ async function fetchCorrelation() {
   element.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Menghitung korelasi...</div></div>`;
 
   try {
-    const data = await fetch(
-      `${API}/analysis/correlation?symbols=${encodeURIComponent(symbols)}`,
-    ).then(safeJson);
+    const data = await apiGet(
+      `/analysis/correlation?symbols=${encodeURIComponent(symbols)}`,
+      1,
+    );
     const matrix = data.correlation_matrix || {};
     const symbolsList = Object.keys(matrix);
     if (!symbolsList.length) {
@@ -771,7 +799,7 @@ async function fetchCorrelation() {
       </div>
     `;
   } catch (error) {
-    element.innerHTML = `<div class="card"><div class="red">Gagal menghitung korelasi: ${error.message}</div></div>`;
+    element.innerHTML = `<div class="card"><div class="red">Gagal menghitung korelasi: ${humanizeError(error)}</div></div>`;
   }
 }
 
