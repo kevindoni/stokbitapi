@@ -1,6 +1,164 @@
 const API = "";
 const pageNames = ["dashboard", "analysis", "sector", "correlation"];
+const WATCHLIST_KEY = "stokbitapi.watchlist";
+const DEFAULT_WATCHLIST = ["BBCA", "BBRI", "TLKM", "ASII"];
 let reqChart = null;
+
+function getWatchlist() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(WATCHLIST_KEY) || "[]");
+    const normalized = saved
+      .map((ticker) =>
+        String(ticker || "")
+          .trim()
+          .toUpperCase(),
+      )
+      .filter((ticker) => /^[A-Z0-9.]{2,12}$/.test(ticker));
+    return normalized.length ? normalized.slice(0, 16) : [...DEFAULT_WATCHLIST];
+  } catch {
+    return [...DEFAULT_WATCHLIST];
+  }
+}
+
+function saveWatchlist(list) {
+  localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list.slice(0, 16)));
+}
+
+function setWatchlistCount(list) {
+  const badge = document.getElementById("watchlist-count");
+  if (badge) {
+    badge.textContent = `${list.length} ticker`;
+  }
+}
+
+async function renderWatchlist() {
+  const container = document.getElementById("watchlist-list");
+  if (!container) return;
+
+  const watchlist = getWatchlist();
+  setWatchlistCount(watchlist);
+  container.innerHTML =
+    '<div class="loading"><span class="spinner"></span>Memuat watchlist...</div>';
+
+  const rows = await Promise.all(
+    watchlist.map(async (symbol) => {
+      try {
+        const [quote, tech] = await Promise.all([
+          fetch(`${API}/quote/${symbol}`).then(safeJson),
+          fetch(`${API}/analysis/technicals/${symbol}`)
+            .then((r) => r.json())
+            .catch(() => ({})),
+        ]);
+
+        const price = Number(
+          quote?.price || quote?.last_price || tech?.price || 0,
+        );
+        const change = Number(quote?.change_pct || quote?.percent_change || 0);
+        const rsi = tech?.indicators?.RSI_14
+          ? Number(tech.indicators.RSI_14)
+          : null;
+        return { symbol, price, change, rsi };
+      } catch {
+        return { symbol, price: 0, change: 0, rsi: null, failed: true };
+      }
+    }),
+  );
+
+  container.innerHTML = rows
+    .map((row) => {
+      const changeClass = row.change >= 0 ? "green" : "red";
+      return `
+        <div class="watch-item">
+          <div class="watch-top">
+            <div>
+              <div class="watch-symbol">${row.symbol}</div>
+              <div class="muted" style="font-size:11px">${row.failed ? "Data belum tersedia" : `RSI ${typeof row.rsi === "number" ? row.rsi.toFixed(1) : "-"}`}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:700">${row.price ? formatRupiah(row.price) : "-"}</div>
+              <div class="${changeClass}" style="font-size:12px">${row.change >= 0 ? "+" : ""}${row.change.toFixed(2)}%</div>
+            </div>
+          </div>
+          <div class="watch-actions">
+            <button class="btn btn-secondary" data-quote="${row.symbol}">Quote</button>
+            <button class="btn btn-secondary" data-analysis="${row.symbol}">Analisis</button>
+            <button class="btn btn-secondary" data-remove-watchlist="${row.symbol}">Hapus</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function addWatchlistTicker() {
+  const input = document.getElementById("watchlist-input");
+  if (!input) return;
+  const symbol = input.value.trim().toUpperCase();
+  if (!/^[A-Z0-9.]{2,12}$/.test(symbol)) {
+    toast("Ticker tidak valid");
+    return;
+  }
+  const list = getWatchlist();
+  if (list.includes(symbol)) {
+    toast("Ticker sudah ada di watchlist");
+    return;
+  }
+  list.unshift(symbol);
+  saveWatchlist(list);
+  input.value = "";
+  renderWatchlist();
+}
+
+function removeWatchlistTicker(symbol) {
+  const list = getWatchlist().filter((ticker) => ticker !== symbol);
+  saveWatchlist(list.length ? list : DEFAULT_WATCHLIST);
+  renderWatchlist();
+}
+
+async function fetchMarketPulse() {
+  const container = document.getElementById("market-pulse-list");
+  if (!container) return;
+  container.innerHTML =
+    '<div class="loading"><span class="spinner"></span>Mengambil market pulse...</div>';
+
+  try {
+    const [lq45, banking] = await Promise.all([
+      fetch(`${API}/analysis/sector-heatmap/lq45`).then(safeJson),
+      fetch(`${API}/analysis/sector-heatmap/bank`).then(safeJson),
+    ]);
+    const picks = [
+      ...(lq45.heatmap || []).slice(0, 4),
+      ...(banking.heatmap || []).slice(0, 2),
+    ]
+      .filter(Boolean)
+      .slice(0, 6);
+
+    container.innerHTML = picks
+      .map((stock) => {
+        const chg = Number(stock.change_pct || 0);
+        const cls = chg >= 0 ? "green" : "red";
+        return `
+          <div class="pulse-item">
+            <div class="pulse-top">
+              <div>
+                <div class="pulse-symbol">${stock.symbol}</div>
+                <div class="muted" style="font-size:11px">${stock.name || "-"}</div>
+              </div>
+              <div class="${cls}" style="font-weight:700">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</div>
+            </div>
+            <div class="pulse-metrics">
+              <span class="pulse-metric">RSI ${stock.RSI ? Number(stock.RSI).toFixed(1) : "-"}</span>
+              <span class="pulse-metric">EMA ${stock.EMA_Trend || "-"}</span>
+              <span class="pulse-metric">${stock.heat || "Signal"}</span>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    container.innerHTML = `<div class="red">Gagal memuat market pulse: ${error.message}</div>`;
+  }
+}
 
 function formatRupiah(value) {
   const number = Number(value || 0);
@@ -98,6 +256,8 @@ async function checkStatus() {
     renderStatCards(health, metrics, auth);
     renderMetricsChart(metrics);
     fetchTopIdeas();
+    fetchMarketPulse();
+    renderWatchlist();
   } catch (error) {
     document.getElementById("server-status").textContent = "Offline";
   }
@@ -620,16 +780,6 @@ function bindEvents() {
     button.addEventListener("click", () => showPage(button.dataset.page));
   });
 
-  document.querySelectorAll("[data-quote]").forEach((button) => {
-    button.addEventListener("click", () => fetchQuote(button.dataset.quote));
-  });
-
-  document.querySelectorAll("[data-analysis]").forEach((button) => {
-    button.addEventListener("click", () =>
-      fetchAnalysis(button.dataset.analysis),
-    );
-  });
-
   document.querySelectorAll(".pill").forEach((pill) => {
     pill.addEventListener("click", () =>
       fetchSector(pill.dataset.sector, pill),
@@ -663,9 +813,41 @@ function bindEvents() {
   document.getElementById("corr-input").addEventListener("keydown", (event) => {
     if (event.key === "Enter") fetchCorrelation();
   });
+
+  const watchlistAddBtn = document.getElementById("watchlist-add-btn");
+  const watchlistInput = document.getElementById("watchlist-input");
+  if (watchlistAddBtn) {
+    watchlistAddBtn.addEventListener("click", addWatchlistTicker);
+  }
+  if (watchlistInput) {
+    watchlistInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") addWatchlistTicker();
+    });
+  }
+
+  document.body.addEventListener("click", (event) => {
+    const quoteButton = event.target.closest("[data-quote]");
+    if (quoteButton) {
+      fetchQuote(quoteButton.dataset.quote);
+      return;
+    }
+
+    const analysisButton = event.target.closest("[data-analysis]");
+    if (analysisButton) {
+      showPage("analysis");
+      fetchAnalysis(analysisButton.dataset.analysis);
+      return;
+    }
+
+    const removeWatchBtn = event.target.closest("[data-remove-watchlist]");
+    if (removeWatchBtn) {
+      removeWatchlistTicker(removeWatchBtn.dataset.removeWatchlist);
+    }
+  });
 }
 
 bindEvents();
 checkStatus();
 setInterval(checkStatus, 30000);
 setInterval(fetchTopIdeas, 120000);
+setInterval(fetchMarketPulse, 120000);

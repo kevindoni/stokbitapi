@@ -32,6 +32,11 @@
         <div class="card-title">Ownership Style Insight</div>
         <h2 class="hero-title">Lihat Sinyal Saham Lebih Cepat</h2>
         <p class="hero-sub">Dashboard ini menampilkan rekomendasi momentum, indikator inti, dan target harga estimasi berbasis data endpoint kamu.</p>
+        <div class="hero-kpis">
+          <div><small>Coverage</small><b>LQ45 + Sektoral</b></div>
+          <div><small>Latency</small><b>Realtime API</b></div>
+          <div><small>Engine</small><b>Signal Scoring</b></div>
+        </div>
         <div class="panel-inline" style="margin-top:12px;flex-wrap:wrap">
           <button class="btn btn-secondary" data-quote="BBCA">BBCA</button>
           <button class="btn btn-secondary" data-quote="BBRI">BBRI</button>
@@ -46,6 +51,32 @@
         </div>
         <div id="ideas-list" class="ideas-list">
           <div class="loading"><span class="spinner"></span>Menyusun ide saham...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2 workspace-grid">
+      <div class="card">
+        <div class="panel-header" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="card-title" style="margin:0">Watchlist Saya</div>
+          <span class="badge badge-blue" id="watchlist-count">0 ticker</span>
+        </div>
+        <div class="panel-inline" style="margin-bottom:12px">
+          <input class="search-input" id="watchlist-input" placeholder="Tambah ticker, contoh: ASII" style="max-width:220px">
+          <button class="btn btn-primary" id="watchlist-add-btn">Tambah</button>
+        </div>
+        <div id="watchlist-list" class="watchlist-list">
+          <div class="muted" style="font-size:13px">Belum ada ticker di watchlist.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="panel-header" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="card-title" style="margin:0">Market Pulse</div>
+          <span class="badge badge-blue">Auto Refresh</span>
+        </div>
+        <div id="market-pulse-list" class="pulse-list">
+          <div class="loading"><span class="spinner"></span>Mengambil market pulse...</div>
         </div>
       </div>
     </div>

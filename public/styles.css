@@ -455,6 +455,94 @@ th {
   line-height: 1.5;
 }
 
+.hero-kpis {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hero-kpis > div {
+  border: 1px solid var(--border);
+  background: rgba(13, 17, 23, 0.38);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 110px;
+}
+
+.hero-kpis small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.hero-kpis b {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.workspace-grid {
+  margin-bottom: 20px;
+}
+
+.watchlist-list,
+.pulse-list {
+  display: grid;
+  gap: 8px;
+}
+
+.watch-item,
+.pulse-item {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.watch-top,
+.pulse-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.watch-symbol,
+.pulse-symbol {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.watch-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.watch-actions .btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.pulse-metrics {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pulse-metric {
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .ideas-list {
   display: grid;
   gap: 10px;
