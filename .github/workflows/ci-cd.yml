@@ -30,10 +30,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger deploy webhook
-        if: ${{ secrets.DEPLOY_WEBHOOK_URL != '' }}
-        run: curl -fsSL -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}"
-
-      - name: Skip deploy when webhook is missing
-        if: ${{ secrets.DEPLOY_WEBHOOK_URL == '' }}
-        run: echo "DEPLOY_WEBHOOK_URL is not configured. Skipping deploy."
+      - name: Trigger deploy webhook (if configured)
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: |
+          if [ -n "$DEPLOY_WEBHOOK_URL" ]; then
+            curl -fsSL -X POST "$DEPLOY_WEBHOOK_URL"
+          else
+            echo "DEPLOY_WEBHOOK_URL is not configured. Skipping deploy."
+          fi

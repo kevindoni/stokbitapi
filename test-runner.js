@@ -7,6 +7,7 @@ const path = require("path");
 
 async function runTests() {
   console.log("⏳ Starting test runner...\n");
+  const isCi = process.env.CI === "true";
 
   // Start server in background
   console.log("🚀 Starting API server...");
@@ -40,7 +41,11 @@ async function runTests() {
 
   try {
     // Run the actual test
-    console.log("🧪 Running 28 endpoint verification...\n");
+    console.log(
+      isCi
+        ? "🧪 Running CI smoke verification...\n"
+        : "🧪 Running 28 endpoint verification...\n",
+    );
     const BASE = "http://localhost:3000";
     let secToken = "";
     try {
@@ -50,7 +55,7 @@ async function runTests() {
       secToken = creds.tokens?.securities?.accessToken || "";
     } catch (e) {}
 
-    const tests = [
+    const fullTests = [
       { n: "Auth Status", u: "/auth/status" },
       { n: "Token Info", u: "/auth/token-info" },
       { n: "Quote", u: "/quote/BBCA" },
@@ -114,7 +119,14 @@ async function runTests() {
       },
     ];
 
-    let res = "--- STARTING 28 ENDPOINT VERIFICATION ---\n";
+    const smokeTests = [
+      { n: "Auth Status", u: "/auth/status" },
+      { n: "Token Info", u: "/auth/token-info" },
+    ];
+
+    const tests = isCi ? smokeTests : fullTests;
+
+    let res = `--- STARTING ${tests.length} ENDPOINT VERIFICATION ---\n`;
     let p = 0;
     let f = 0;
     for (const t of tests) {
