@@ -124,20 +124,8 @@ async function fetchMarketPulse() {
     '<div class="loading"><span class="spinner"></span>Mengambil market pulse...</div>';
 
   try {
-    const lq45 =
-      latestLq45 || (await apiGet(`/analysis/sector-heatmap/lq45`, 1));
-    const banking =
-      latestBanking || (await apiGet(`/analysis/sector-heatmap/bank`, 1));
-
-    latestLq45 = lq45;
-    latestBanking = banking;
-
-    const picks = [
-      ...(lq45.heatmap || []).slice(0, 4),
-      ...(banking.heatmap || []).slice(0, 2),
-    ]
-      .filter(Boolean)
-      .slice(0, 6);
+    const pulse = await apiGet(`/ui/pulse`, 1);
+    const picks = (pulse.items || []).filter(Boolean).slice(0, 6);
 
     container.innerHTML = picks
       .map((stock) => {
@@ -303,9 +291,8 @@ async function fetchTopIdeas() {
   if (!container) return;
 
   try {
-    const sector = await apiGet(`/analysis/sector-heatmap/lq45`, 1);
-    latestLq45 = sector;
-    const picks = (sector.heatmap || []).slice(0, 6);
+    const ideas = await apiGet(`/ui/ideas`, 1);
+    const picks = (ideas.items || []).slice(0, 6);
 
     if (!picks.length) {
       container.innerHTML =
@@ -483,11 +470,11 @@ function renderMetricsChart(metrics) {
 
 async function pingEndpoints() {
   const endpoints = [
+    { name: "Health", url: "/health" },
     { name: "Auth Status", url: "/auth/status" },
     { name: "Token Info", url: "/auth/token-info" },
     { name: "Market Summary", url: "/market/summary" },
-    { name: "Quote BBCA", url: "/quote/BBCA" },
-    { name: "Analysis Technicals", url: "/analysis/technicals/BBCA" },
+    { name: "Metrics", url: "/metrics" },
   ];
   const container = document.getElementById("endpoint-status-list");
   container.innerHTML =
@@ -522,11 +509,10 @@ async function fetchQuote(explicitSymbol) {
   element.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Memuat data ${symbol}...</div></div>`;
 
   try {
-    const [quoteRes, techRes, fundRes] = await Promise.all([
-      apiGet(`/quote/${symbol}`, 1),
-      apiGet(`/analysis/technicals/${symbol}`, 1),
-      apiGet(`/analysis/fundamentals/${symbol}`, 1),
-    ]);
+    const payload = await apiGet(`/ui/stock/${symbol}/summary`, 1);
+    const quoteRes = payload.quote || {};
+    const techRes = payload.technicals || {};
+    const fundRes = payload.fundamentals || {};
 
     const price =
       quoteRes?.price ?? quoteRes?.last_price ?? techRes?.price ?? 0;
@@ -622,17 +608,12 @@ async function fetchAnalysis(explicitSymbol) {
   element.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Analisis lengkap ${symbol}...</div></div>`;
 
   try {
-    const [techRes, fundRes, compRes, divRes, perfRes] = await Promise.all([
-      apiGet(`/analysis/technicals/${symbol}`, 1),
-      apiGet(`/analysis/fundamentals/${symbol}`, 1),
-      apiGet(`/analysis/company/${symbol}`, 1),
-      fetch(`${API}/analysis/dividends/${symbol}`)
-        .then((res) => res.json())
-        .catch(() => ({})),
-      fetch(`${API}/analysis/performance/${symbol}`)
-        .then((res) => res.json())
-        .catch(() => ({})),
-    ]);
+    const payload = await apiGet(`/ui/stock/${symbol}/details`, 1);
+    const techRes = payload.technicals || {};
+    const fundRes = payload.fundamentals || {};
+    const compRes = payload.company || {};
+    const divRes = payload.dividends || {};
+    const perfRes = payload.performance || {};
 
     const indicators = techRes?.indicators || {};
     const supportResistance = techRes?.support_resistance || {};

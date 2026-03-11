@@ -213,6 +213,40 @@ const runtimeMetrics = {
 };
 
 const responseCache = new Map();
+const uiSnapshotCache = new Map();
+
+function rememberUiSnapshot(key, payload) {
+  uiSnapshotCache.set(key, {
+    payload,
+    expiresAt: Date.now() + CACHE_TTL_HEAVY_MS,
+  });
+  return payload;
+}
+
+function getUiSnapshot(key) {
+  const hit = uiSnapshotCache.get(key);
+  if (!hit || hit.expiresAt <= Date.now()) {
+    return null;
+  }
+  return hit.payload;
+}
+
+async function callLocalEndpoint(pathname, timeout = 15000) {
+  try {
+    const response = await axios.get(`http://127.0.0.1:${PORT}${pathname}`, {
+      timeout,
+      validateStatus: () => true,
+    });
+
+    if (response.status >= 200 && response.status < 300) {
+      return response.data;
+    }
+  } catch {
+    // ignore and degrade gracefully for UI aggregation endpoints
+  }
+
+  return null;
+}
 
 function createRouteCache(ttlMs = CACHE_TTL_SHORT_MS) {
   return (req, res, next) => {
@@ -781,6 +815,116 @@ app.get("/metrics", (req, res) => {
     inFlightHeavy: runtimeMetrics.inFlightHeavy,
     cacheEntries: responseCache.size,
     uptimeSec: Math.round(process.uptime()),
+  });
+});
+
+app.get("/ui/ideas", async (req, res) => {
+  const sector = await callLocalEndpoint(
+    "/analysis/sector-heatmap/lq45",
+    25000,
+  );
+
+  if (!sector) {
+    return res.json(
+      getUiSnapshot("ideas") || {
+        partial: true,
+        items: [],
+      },
+    );
+  }
+
+  const payload = {
+    partial: false,
+    items: (sector.heatmap || []).slice(0, 6).map((stock) => ({
+      symbol: stock.symbol,
+      name: stock.name || stock.symbol,
+      price: stock.price || 0,
+      change_pct: stock.change_pct || 0,
+      RSI: stock.RSI || null,
+      EMA_Trend: stock.EMA_Trend || "-",
+      MACD_Trend: stock.MACD_Trend || "-",
+      heat: stock.heat || "Signal",
+    })),
+  };
+
+  return res.json(rememberUiSnapshot("ideas", payload));
+});
+
+app.get("/ui/pulse", async (req, res) => {
+  const [lq45, bank] = await Promise.all([
+    callLocalEndpoint("/analysis/sector-heatmap/lq45", 25000),
+    callLocalEndpoint("/analysis/sector-heatmap/bank", 25000),
+  ]);
+
+  if (!lq45 && !bank) {
+    return res.json(
+      getUiSnapshot("pulse") || {
+        partial: true,
+        items: [],
+      },
+    );
+  }
+
+  const items = [
+    ...(lq45?.heatmap || []).slice(0, 4),
+    ...(bank?.heatmap || []).slice(0, 2),
+  ].map((stock) => ({
+    symbol: stock.symbol,
+    name: stock.name || stock.symbol,
+    change_pct: stock.change_pct || 0,
+    RSI: stock.RSI || null,
+    EMA_Trend: stock.EMA_Trend || "-",
+    heat: stock.heat || "Signal",
+  }));
+
+  return res.json(
+    rememberUiSnapshot("pulse", {
+      partial: false,
+      items,
+    }),
+  );
+});
+
+app.get("/ui/stock/:symbol/summary", async (req, res) => {
+  const symbol = req.params.symbol;
+  const [quote, technicals, fundamentals] = await Promise.all([
+    callLocalEndpoint(`/quote/${symbol}`, 15000),
+    callLocalEndpoint(`/analysis/technicals/${symbol}`, 20000),
+    callLocalEndpoint(`/analysis/fundamentals/${symbol}`, 20000),
+  ]);
+
+  res.json({
+    partial: !(quote && technicals && fundamentals),
+    quote: quote || {},
+    technicals: technicals || {},
+    fundamentals: fundamentals || {},
+  });
+});
+
+app.get("/ui/stock/:symbol/details", async (req, res) => {
+  const symbol = req.params.symbol;
+  const [technicals, fundamentals, company, dividends, performance] =
+    await Promise.all([
+      callLocalEndpoint(`/analysis/technicals/${symbol}`, 20000),
+      callLocalEndpoint(`/analysis/fundamentals/${symbol}`, 20000),
+      callLocalEndpoint(`/analysis/company/${symbol}`, 15000),
+      callLocalEndpoint(`/analysis/dividends/${symbol}`, 15000),
+      callLocalEndpoint(`/analysis/performance/${symbol}`, 15000),
+    ]);
+
+  res.json({
+    partial: !(
+      technicals &&
+      fundamentals &&
+      company &&
+      dividends &&
+      performance
+    ),
+    technicals: technicals || {},
+    fundamentals: fundamentals || {},
+    company: company || {},
+    dividends: dividends || {},
+    performance: performance || {},
   });
 });
 
