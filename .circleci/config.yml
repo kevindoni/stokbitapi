@@ -25,7 +25,29 @@ jobs:
           name: Run smoke tests (CI mode)
           command: CI=true npm test
 
+  deploy-render:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - run:
+          name: Trigger Render deploy (optional)
+          command: |
+            if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+              echo "RENDER_DEPLOY_HOOK is not set. Skipping deploy step."
+              exit 0
+            fi
+
+            echo "Triggering Render deployment..."
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK"
+            echo "Render deploy triggered successfully."
+
 workflows:
   ci:
     jobs:
       - test
+      - deploy-render:
+          requires:
+            - test
+          filters:
+            branches:
+              only: main
