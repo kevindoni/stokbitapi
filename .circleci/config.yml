@@ -4,6 +4,9 @@ jobs:
   test:
     docker:
       - image: cimg/node:22.11
+    environment:
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
     working_directory: ~/project
     steps:
       - checkout
