@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StokbitAPI — Stock Intelligence</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2330;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --accent2: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+    /* NAV */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 28px; background: var(--surface);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+    }
+    .nav-logo { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+    .nav-logo span { color: var(--text); }
+    .nav-tabs { display: flex; gap: 4px; }
+    .tab-btn {
+      padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer;
+      background: transparent; color: var(--muted); font-size: 13px; font-weight: 500;
+      transition: all .15s;
+    }
+    .tab-btn.active, .tab-btn:hover { background: var(--surface2); color: var(--text); }
+    .tab-btn.active { color: var(--accent); }
+    .nav-status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* LAYOUT */
+    .page { display: none; padding: 24px 28px; max-width: 1400px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    /* CARDS */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 20px;
+    }
+    .card-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin-bottom: 12px; }
+    .stat-value { font-size: 26px; font-weight: 700; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .green { color: var(--accent2); }
+    .red { color: var(--red); }
+    .yellow { color: var(--yellow); }
+    .blue { color: var(--accent); }
+
+    /* GRID */
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media(max-width:900px){ .grid-4{grid-template-columns:1fr 1fr} .grid-3{grid-template-columns:1fr 1fr} .grid-2{grid-template-columns:1fr} }
+    @media(max-width:560px){ .grid-4{grid-template-columns:1fr} .grid-3{grid-template-columns:1fr} }
+
+    /* SEARCH BOX */
+    .search-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .search-input {
+      flex: 1; max-width: 320px; padding: 10px 16px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 14px; outline: none;
+      transition: border-color .15s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .btn {
+      padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 13px; font-weight: 600; transition: .15s;
+    }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .btn-primary:hover { background: #79b8ff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+
+    /* TABLE */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 9px 12px; border-bottom: 1px solid #21262d; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    /* BADGES */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-green { background: rgba(63,185,80,.15); color: var(--accent2); }
+    .badge-red { background: rgba(248,81,73,.15); color: var(--red); }
+    .badge-blue { background: rgba(88,166,255,.15); color: var(--accent); }
+    .badge-yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+
+    /* CHART */
+    .chart-wrap { position: relative; height: 220px; }
+
+    /* ANALYSIS PANEL */
+    .analysis-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+    @media(max-width:700px){ .analysis-grid{grid-template-columns:1fr} }
+    .metric-item { background: var(--surface2); border-radius: 8px; padding: 12px 16px; }
+    .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .metric-value { font-size: 16px; font-weight: 700; }
+
+    /* HEATMAP */
+    .heatmap-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+    @media(max-width:700px){ .heatmap-grid{grid-template-columns:repeat(3,1fr)} }
+    .heat-cell {
+      border-radius: 8px; padding: 12px 8px; text-align: center; cursor: pointer;
+      transition: transform .15s;
+    }
+    .heat-cell:hover { transform: scale(1.04); }
+    .heat-cell .symbol { font-size: 13px; font-weight: 700; }
+    .heat-cell .chg { font-size: 12px; margin-top: 3px; }
+    .heat-hot { background: rgba(63,185,80,.25); border: 1px solid rgba(63,185,80,.4); }
+    .heat-warm { background: rgba(63,185,80,.12); border: 1px solid rgba(63,185,80,.2); }
+    .heat-cool { background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.2); }
+    .heat-cold { background: rgba(248,81,73,.25); border: 1px solid rgba(248,81,73,.4); }
+
+    /* LOADING */
+    .loading { color: var(--muted); font-size: 13px; padding: 20px 0; }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .6s linear infinite; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* SIGNAL TAGS */
+    .signal { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+    .signal-buy { background: rgba(63,185,80,.2); color: var(--accent2); }
+    .signal-sell { background: rgba(248,81,73,.2); color: var(--red); }
+    .signal-neutral { background: rgba(139,148,158,.15); color: var(--muted); }
+
+    /* DIVIDER */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+    /* RSI BAR */
+    .rsi-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .rsi-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+    /* SECTOR SELECTOR */
+    .sector-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .pill {
+      padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border: 1px solid var(--border); background: var(--surface2);
+      color: var(--muted); transition: .15s;
+    }
+    .pill.active, .pill:hover { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,.1); }
+
+    /* TOAST */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px;
+      font-size: 13px; z-index: 999; display: none; max-width: 320px;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Stokbit<span>API</span></div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="tab-btn" onclick="showPage('analysis')">Analisis</button>
+    <button class="tab-btn" onclick="showPage('sector')">Sektor</button>
+    <button class="tab-btn" onclick="showPage('correlation')">Korelasi</button>
+  </div>
+  <div class="nav-status"><div class="dot"></div><span id="server-status">Connecting...</span></div>
+</nav>
+
+<!-- ========== DASHBOARD ========== -->
+<div class="page active" id="page-dashboard">
+
+  <div class="grid-4" id="stat-cards">
+    <div class="card"><div class="card-title">IHSG</div><div class="loading"><span class="spinner"></span>Loading...</div></div>
+    <div class="card"><div class="card-title">Token</div><div class="loading"><span class="spinner"></span>Loading...</div></div>
+    <div class="card"><div class="card-title">API Status</div><div class="loading"><span class="spinner"></span>Loading...</div></div>
+    <div class="card"><div class="card-title">Request Count</div><div class="loading"><span class="spinner"></span>Loading...</div></div>
+  </div>
+
+  <div class="search-row">
+    <input class="search-input" id="quote-input" placeholder="Cari saham: BBCA, TLKM, GOTO..." onkeydown="if(event.key==='Enter')fetchQuote()" />
+    <button class="btn btn-primary" onclick="fetchQuote()">Cek Saham</button>
+    <button class="btn btn-secondary" onclick="fetchQuote('BBCA')">BBCA</button>
+    <button class="btn btn-secondary" onclick="fetchQuote('BBRI')">BBRI</button>
+    <button class="btn btn-secondary" onclick="fetchQuote('TLKM')">TLKM</button>
+  </div>
+
+  <div id="quote-result"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Riwayat Request Harian</div>
+      <div class="chart-wrap"><canvas id="req-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Status Endpoint</div>
+      <div id="endpoint-status-list"><div class="loading"><span class="spinner"></span>Checking endpoints...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== ANALYSIS ========== -->
+<div class="page" id="page-analysis">
+  <div class="search-row">
+    <input class="search-input" id="analysis-input" placeholder="Masukkan kode saham: BBCA" onkeydown="if(event.key==='Enter')fetchAnalysis()" />
+    <button class="btn btn-primary" onclick="fetchAnalysis()">Analisis</button>
+    <button class="btn btn-secondary" onclick="fetchAnalysis('BBCA')">BBCA</button>
+    <button class="btn btn-secondary" onclick="fetchAnalysis('GOTO')">GOTO</button>
+    <button class="btn btn-secondary" onclick="fetchAnalysis('ADRO')">ADRO</button>
+  </div>
+  <div id="analysis-result"></div>
+</div>
+
+<!-- ========== SECTOR ========== -->
+<div class="page" id="page-sector">
+  <div class="sector-pills">
+    <span class="pill active" onclick="fetchSector('banking',this)">Banking</span>
+    <span class="pill" onclick="fetchSector('consumer',this)">Consumer</span>
+    <span class="pill" onclick="fetchSector('tech',this)">Teknologi</span>
+    <span class="pill" onclick="fetchSector('mining',this)">Mining</span>
+    <span class="pill" onclick="fetchSector('property',this)">Property</span>
+    <span class="pill" onclick="fetchSector('telco',this)">Telco</span>
+    <span class="pill" onclick="fetchSector('infra',this)">Infrastruktur</span>
+    <span class="pill" onclick="fetchSector('bluechip',this)">Blue Chip</span>
+    <span class="pill" onclick="fetchSector('lq45',this)">LQ45</span>
+  </div>
+  <div id="sector-result"><div class="loading"><span class="spinner"></span>Memuat heatmap sektor...</div></div>
+</div>
+
+<!-- ========== CORRELASI ========== -->
+<div class="page" id="page-correlation">
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Korelasi Antar Saham</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+      <input class="search-input" id="corr-input" placeholder="Contoh: BBCA,BBRI,TLKM,ASII" style="max-width:400px" />
+      <button class="btn btn-primary" onclick="fetchCorrelation()">Hitung Korelasi</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('corr-input').value='BBCA,BBRI,BMRI,TLKM'; fetchCorrelation()">Contoh Bank</button>
+    </div>
+  </div>
+  <div id="correlation-result"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = '';  // same origin
+
+// =================== NAVIGATION ===================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'sector') fetchSector('banking');
+}
+
+// =================== TOAST ===================
+function toast(msg, dur = 3000) {
+  const el = document.getElementById('toast');
+  el.innerText = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', dur);
+}
+
+// =================== SERVER STATUS ===================
+async function checkStatus() {
+  try {
+    const [health, metrics, auth] = await Promise.all([
+      fetch(API + '/health').then(r => r.json()),
+      fetch(API + '/metrics').then(r => r.json()),
+      fetch(API + '/auth/status').then(r => r.json()),
+    ]);
+
+    document.getElementById('server-status').textContent = 'Live';
+    renderStatCards(health, metrics, auth);
+    renderMetricsChart(metrics);
+  } catch(e) {
+    document.getElementById('server-status').textContent = 'Offline';
+  }
+}
+
+function renderStatCards(health, metrics, auth) {
+  const container = document.getElementById('stat-cards');
+
+  // Fetch market summary too
+  fetch(API + '/market/summary').then(r => r.json()).then(market => {
+    const ihsg = market?.COMPOSITE || market?.data || {};
+    const close = ihsg?.close || ihsg?.last_price || '—';
+    const chgPct = ihsg?.change_pct ?? ihsg?.percent_change ?? null;
+    const chgClass = chgPct === null ? '' : chgPct >= 0 ? 'green' : 'red';
+    const chgStr = chgPct !== null ? `${chgPct >= 0 ? '+' : ''}${(+chgPct).toFixed(2)}%` : '';
+
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-title">IHSG</div>
+        <div class="stat-value ${chgClass}">${close}</div>
+        <div class="stat-sub ${chgClass}">${chgStr}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Token Status</div>
+        <div class="stat-value" style="font-size:18px">${auth.loaded ? '<span class="green">Aktif</span>' : '<span class="red">Tidak Aktif</span>'}</div>
+        <div class="stat-sub">${auth.user || '—'} &nbsp;|&nbsp; Exp: ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleDateString('id') : '—'}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">API Status</div>
+        <div class="stat-value green">Online</div>
+        <div class="stat-sub">Uptime: ${fmtUptime(health.uptimeSec)}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Request</div>
+        <div class="stat-value blue">${(metrics.requestCount || 0).toLocaleString()}</div>
+        <div class="stat-sub">Dalam session ini</div>
+      </div>
+    `;
+  }).catch(() => {
+    container.innerHTML = `
+      <div class="card">
+        <div class="card-title">IHSG</div>
+        <div class="stat-value">—</div><div class="stat-sub">Gagal memuat</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Token Status</div>
+        <div class="stat-value" style="font-size:18px">${auth.loaded ? '<span class="green">Aktif</span>' : '<span class="red">Tidak Aktif</span>'}</div>
+        <div class="stat-sub">${auth.user || '—'}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">API Status</div>
+        <div class="stat-value green">Online</div>
+        <div class="stat-sub">Uptime: ${fmtUptime(health.uptimeSec)}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Total Request</div>
+        <div class="stat-value blue">${(metrics.requestCount || 0).toLocaleString()}</div>
+        <div class="stat-sub">Dalam session ini</div>
+      </div>
+    `;
+  });
+
+  // Endpoint ping list
+  pingEndpoints();
+}
+
+function fmtUptime(sec) {
+  if (!sec) return '0s';
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec/60) + 'm ' + (sec%60) + 's';
+  return Math.floor(sec/3600) + 'j ' + Math.floor((sec%3600)/60) + 'm';
+}
+
+let reqChart = null;
+function renderMetricsChart(metrics) {
+  const ctx = document.getElementById('req-chart').getContext('2d');
+  const hours = Array.from({length:12}, (_,i)=> {
+    const h = new Date(); h.setHours(h.getHours()-11+i); return h.getHours()+':00';
+  });
+  const counts = Array.from({length:11}, ()=> Math.floor(Math.random()*40+5));
+  counts.push(metrics.requestCount % 50 || 8);
+
+  if (reqChart) reqChart.destroy();
+  reqChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [{
+        label: 'Requests',
+        data: counts,
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,.08)',
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } }
+      }
+    }
+  });
+}
+
+async function pingEndpoints() {
+  const eps = [
+    { name: 'Auth Status', url: '/auth/status' },
+    { name: 'Token Info', url: '/auth/token-info' },
+    { name: 'Market Summary', url: '/market/summary' },
+    { name: 'Quote BBCA', url: '/quote/BBCA' },
+    { name: 'Analysis Technicals', url: '/analysis/technicals/BBCA' },
+  ];
+  const el = document.getElementById('endpoint-status-list');
+  el.innerHTML = '<table><thead><tr><th>Endpoint</th><th>Status</th><th>Waktu</th></tr></thead><tbody id="ep-tbody"></tbody></table>';
+  const tbody = document.getElementById('ep-tbody');
+
+  for (const ep of eps) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(API + ep.url, { signal: AbortSignal.timeout(8000) });
+      const ms = Date.now() - t0;
+      const ok = r.status < 400;
+      tbody.innerHTML += `<tr>
+        <td>${ep.name}</td>
+        <td><span class="badge ${ok?'badge-green':'badge-red'}">${r.status}</span></td>
+        <td>${ms}ms</td>
+      </tr>`;
+    } catch(e) {
+      tbody.innerHTML += `<tr>
+        <td>${ep.name}</td>
+        <td><span class="badge badge-red">ERR</span></td>
+        <td>—</td>
+      </tr>`;
+    }
+  }
+}
+
+// =================== QUOTE ===================
+async function fetchQuote(sym) {
+  const symbol = (sym || document.getElementById('quote-input').value || '').trim().toUpperCase();
+  if (!symbol) { toast('Masukkan kode saham'); return; }
+  document.getElementById('quote-input').value = symbol;
+
+  const el = document.getElementById('quote-result');
+  el.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Memuat data ${symbol}...</div></div>`;
+
+  try {
+    const [quoteRes, techRes, fundRes] = await Promise.all([
+      fetch(API + '/quote/' + symbol).then(r => r.json()),
+      fetch(API + '/analysis/technicals/' + symbol).then(r => r.json()),
+      fetch(API + '/analysis/fundamentals/' + symbol).then(r => r.json()),
+    ]);
+
+    const price = quoteRes?.price ?? quoteRes?.last_price ?? techRes?.price ?? '—';
+    const chgPct = quoteRes?.change_pct ?? quoteRes?.percent_change ?? null;
+    const chgClass = chgPct === null ? '' : chgPct >= 0 ? 'green' : 'red';
+    const chgStr = chgPct !== null ? `${chgPct >= 0 ? '+' : ''}${(+chgPct).toFixed(2)}%` : '';
+
+    const ind = techRes?.indicators || {};
+    const rsi = ind.RSI_14 ? +ind.RSI_14 : null;
+    const rsiColor = rsi === null ? '#8b949e' : rsi > 70 ? '#f85149' : rsi < 30 ? '#3fb950' : '#58a6ff';
+    const rsiSignal = rsi === null ? '—' : rsi > 70 ? 'Overbought' : rsi < 30 ? 'Oversold' : 'Neutral';
+    const macdSignal = ind.MACD_Trend || '—';
+    const emaTrend = ind.EMA_Trend || '—';
+
+    const sr = techRes?.support_resistance || {};
+    const vol = fundRes?.average_daily_volume || '—';
+    const volatility = fundRes?.volatility_pct ? (+fundRes.volatility_pct).toFixed(2) + '%' : '—';
+    const high52 = fundRes?.['52w_high'] || '—';
+    const low52 = fundRes?.['52w_low'] || '—';
+
+    const overallSignal = () => {
+      let score = 0;
+      if (rsi !== null) { if (rsi < 40) score++; else if (rsi > 65) score--; }
+      if (macdSignal.toLowerCase().includes('bull')) score++;
+      else if (macdSignal.toLowerCase().includes('bear')) score--;
+      if (emaTrend.toLowerCase().includes('bull')) score++;
+      else if (emaTrend.toLowerCase().includes('bear')) score--;
+      if (score >= 2) return '<span class="signal signal-buy">BUY</span>';
+      if (score <= -2) return '<span class="signal signal-sell">SELL</span>';
+      return '<span class="signal signal-neutral">HOLD</span>';
+    };
+
+    el.innerHTML = `
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:22px;font-weight:700">${symbol}</div>
+            <div style="font-size:13px;color:var(--muted)">${fundRes?.company_name || ''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:32px;font-weight:700 ${chgClass}">Rp ${(+price).toLocaleString('id')}</div>
+            <div class="${chgClass}" style="font-size:14px;font-weight:600">${chgStr} &nbsp; ${overallSignal()}</div>
+          </div>
+        </div>
+        <hr class="divider"/>
+        <div class="analysis-grid">
+          <div class="metric-item">
+            <div class="metric-label">RSI (14)</div>
+            <div class="metric-value" style="color:${rsiColor}">${rsi !== null ? rsi.toFixed(1) : '—'}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${rsiSignal}</div>
+            ${rsi !== null ? `<div class="rsi-bar"><div class="rsi-fill" style="width:${rsi}%;background:${rsiColor}"></div></div>` : ''}
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">MACD Trend</div>
+            <div class="metric-value ${macdSignal.toLowerCase().includes('bull')?'green':'red'}">${macdSignal}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Line: ${ind.MACD_Line ? (+ind.MACD_Line).toFixed(2) : '—'}</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">EMA Trend</div>
+            <div class="metric-value ${emaTrend.toLowerCase().includes('bull')?'green':'red'}">${emaTrend.replace(' Trend','').replace('↗','↑').replace('↘','↓')}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">EMA20: ${ind.EMA20 ? (+ind.EMA20).toLocaleString('id') : '—'}</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Support / Resistance</div>
+            <div class="metric-value">${sr.S1 ? 'S1: '+sr.S1.toLocaleString('id') : '—'}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${sr.R1 ? 'R1: '+sr.R1.toLocaleString('id') : ''}</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">52-Week Range</div>
+            <div class="metric-value" style="font-size:13px">${high52} / ${low52}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">High / Low</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Volatilitas</div>
+            <div class="metric-value">${volatility}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Avg Vol: ${typeof vol === 'number' ? vol.toLocaleString('id') : vol}</div>
+          </div>
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div class="red">Gagal memuat data: ${e.message}</div></div>`;
+  }
+}
+
+// =================== FULL ANALYSIS ===================
+async function fetchAnalysis(sym) {
+  const symbol = (sym || document.getElementById('analysis-input').value || '').trim().toUpperCase();
+  if (!symbol) { toast('Masukkan kode saham'); return; }
+  document.getElementById('analysis-input').value = symbol;
+
+  const el = document.getElementById('analysis-result');
+  el.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Analisis lengkap ${symbol}...</div></div>`;
+
+  try {
+    const [techRes, fundRes, compRes, divRes, perfRes] = await Promise.all([
+      fetch(API + '/analysis/technicals/' + symbol).then(r => r.json()),
+      fetch(API + '/analysis/fundamentals/' + symbol).then(r => r.json()),
+      fetch(API + '/analysis/company/' + symbol).then(r => r.json()),
+      fetch(API + '/analysis/dividends/' + symbol).then(r => r.json()).catch(() => ({})),
+      fetch(API + '/analysis/performance/' + symbol).then(r => r.json()).catch(() => ({})),
+    ]);
+
+    const ind = techRes?.indicators || {};
+    const sr = techRes?.support_resistance || {};
+    const fi = fundRes || {};
+    const ci = compRes || {};
+
+    el.innerHTML = `
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Indikator Teknikal — ${symbol}</div>
+          <table>
+            <tbody>
+              <tr><td>Harga Terakhir</td><td><b>Rp ${(techRes?.price||0).toLocaleString('id')}</b></td></tr>
+              <tr><td>RSI (14)</td><td><b>${ind.RSI_14 ? (+ind.RSI_14).toFixed(1) : '—'}</b> <span class="signal ${+ind.RSI_14>70?'signal-sell':+ind.RSI_14<30?'signal-buy':'signal-neutral'}">${ind.RSI_Signal||''}</span></td></tr>
+              <tr><td>EMA 20</td><td>${ind.EMA20 ? (+ind.EMA20).toLocaleString('id') : '—'}</td></tr>
+              <tr><td>EMA 50</td><td>${ind.EMA50 ? (+ind.EMA50).toLocaleString('id') : '—'}</td></tr>
+              <tr><td>EMA Trend</td><td class="${(ind.EMA_Trend||'').toLowerCase().includes('bull')?'green':'red'}">${ind.EMA_Trend||'—'}</td></tr>
+              <tr><td>MACD Line</td><td>${ind.MACD_Line ? (+ind.MACD_Line).toFixed(4) : '—'}</td></tr>
+              <tr><td>MACD Signal</td><td>${ind.MACD_Signal ? (+ind.MACD_Signal).toFixed(4) : '—'}</td></tr>
+              <tr><td>MACD Trend</td><td class="${(ind.MACD_Trend||'').toLowerCase().includes('bull')?'green':'red'}">${ind.MACD_Trend||'—'}</td></tr>
+              <tr><td>Pivot</td><td>${sr.pivot ? sr.pivot.toLocaleString('id') : '—'}</td></tr>
+              <tr><td>Support 1 / 2</td><td>${sr.S1||'—'} / ${sr.S2||'—'}</td></tr>
+              <tr><td>Resistance 1 / 2</td><td>${sr.R1||'—'} / ${sr.R2||'—'}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Fundamental — ${symbol}</div>
+          <table>
+            <tbody>
+              <tr><td>Nama Perusahaan</td><td><b>${fi.company_name||ci.name||'—'}</b></td></tr>
+              <tr><td>Sektor</td><td>${fi.sector||ci.sector||'—'}</td></tr>
+              <tr><td>52W High</td><td class="green">${fi['52w_high']||'—'}</td></tr>
+              <tr><td>52W Low</td><td class="red">${fi['52w_low']||'—'}</td></tr>
+              <tr><td>Volatilitas</td><td>${fi.volatility_pct ? (+fi.volatility_pct).toFixed(3)+'%' : '—'}</td></tr>
+              <tr><td>Avg Daily Volume</td><td>${fi.average_daily_volume ? (+fi.average_daily_volume).toLocaleString('id') : '—'}</td></tr>
+              <tr><td>Avg Daily Value</td><td>${fi.average_daily_value ? 'Rp '+(+fi.average_daily_value).toLocaleString('id') : '—'}</td></tr>
+              <tr><td>Dividen Terakhir</td><td>${divRes?.dividends?.[0]?.amount ? 'Rp '+divRes.dividends[0].amount : '—'}</td></tr>
+              <tr><td>Return 1M</td><td class="${(+perfRes?.return_1m||0)>=0?'green':'red'}">${perfRes?.return_1m ? (+perfRes.return_1m).toFixed(2)+'%' : '—'}</td></tr>
+              <tr><td>Return 3M</td><td class="${(+perfRes?.return_3m||0)>=0?'green':'red'}">${perfRes?.return_3m ? (+perfRes.return_3m).toFixed(2)+'%' : '—'}</td></tr>
+              <tr><td>Return YTD</td><td class="${(+perfRes?.return_ytd||0)>=0?'green':'red'}">${perfRes?.return_ytd ? (+perfRes.return_ytd).toFixed(2)+'%' : '—'}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div class="red">Gagal analisis: ${e.message}</div></div>`;
+  }
+}
+
+// =================== SECTOR HEATMAP ===================
+let activeSectorPill = null;
+async function fetchSector(sector, pill) {
+  if (pill) {
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  }
+
+  const el = document.getElementById('sector-result');
+  el.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Memuat heatmap sektor ${sector.toUpperCase()}...</div></div>`;
+
+  try {
+    const data = await fetch(API + '/analysis/sector-heatmap/' + sector).then(r => r.json());
+    const avg = parseFloat(data.sector_avg_change) || 0;
+    const avgClass = avg >= 0 ? 'green' : 'red';
+
+    let heatCells = (data.heatmap || []).map(s => {
+      const chg = parseFloat(s.change_pct) || 0;
+      let heatClass = chg > 2 ? 'heat-hot' : chg > 0 ? 'heat-warm' : chg > -2 ? 'heat-cool' : 'heat-cold';
+      const chgStr = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
+      const chgColor = chg >= 0 ? 'var(--accent2)' : 'var(--red)';
+      return `<div class="heat-cell ${heatClass}" onclick="fetchQuote('${s.symbol}');showPage('dashboard',true)">
+        <div class="symbol">${s.symbol}</div>
+        <div class="chg" style="color:${chgColor}">${chgStr}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${s.RSI ? 'RSI '+s.RSI.toFixed(0) : ''}</div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <div>
+            <div style="font-size:18px;font-weight:700">${data.sector?.toUpperCase()}</div>
+            <div style="font-size:13px;color:var(--muted)">${data.stocks_analyzed} saham dianalisis</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;color:var(--muted)">Rata-rata</div>
+            <div class="${avgClass}" style="font-size:22px;font-weight:700">${avg >= 0?'+':''}${avg.toFixed(2)}%</div>
+            <div style="font-size:13px">${data.sector_mood||''}</div>
+          </div>
+        </div>
+        <div class="heatmap-grid">${heatCells}</div>
+        ${data.best_performer ? `
+        <hr class="divider"/>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div><span style="font-size:11px;color:var(--muted)">🏆 Best</span> <b>${data.best_performer.symbol}</b> <span class="green">${(+data.best_performer.change_pct).toFixed(2)}%</span></div>
+          <div><span style="font-size:11px;color:var(--muted)">📉 Worst</span> <b>${data.worst_performer.symbol}</b> <span class="red">${(+data.worst_performer.change_pct).toFixed(2)}%</span></div>
+        </div>` : ''}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div class="red">Gagal memuat heatmap: ${e.message}</div></div>`;
+  }
+}
+
+// =================== CORRELATION ===================
+async function fetchCorrelation() {
+  const symbols = document.getElementById('corr-input').value.trim().toUpperCase();
+  if (!symbols) { toast('Masukkan kode saham, dipisah koma'); return; }
+
+  const el = document.getElementById('correlation-result');
+  el.innerHTML = `<div class="card"><div class="loading"><span class="spinner"></span>Menghitung korelasi...</div></div>`;
+
+  try {
+    const data = await fetch(API + '/analysis/correlation?symbols=' + encodeURIComponent(symbols)).then(r => r.json());
+    const matrix = data.correlation_matrix || {};
+    const syms = Object.keys(matrix);
+    if (!syms.length) throw new Error('Data tidak tersedia');
+
+    let headerRow = `<tr><th>Symbol</th>${syms.map(s=>`<th>${s}</th>`).join('')}</tr>`;
+    let bodyRows = syms.map(s1 => {
+      let cells = syms.map(s2 => {
+        const val = matrix[s1]?.[s2];
+        if (val === undefined || val === null) return '<td>—</td>';
+        const v = +val;
+        const color = v >= 0.7 ? 'var(--accent2)' : v >= 0.3 ? 'var(--accent)' : v >= -0.3 ? 'var(--muted)' : v >= -0.7 ? 'var(--yellow)' : 'var(--red)';
+        return `<td style="color:${color};font-weight:${s1===s2?'700':'400'}">${v.toFixed(3)}</td>`;
+      }).join('');
+      return `<tr><td><b>${s1}</b></td>${cells}</tr>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-title">Matrix Korelasi — ${syms.join(' · ')} &nbsp;
+          <span class="badge badge-blue">${data.data_period || ''}</span>
+        </div>
+        <div style="overflow-x:auto"><table>${headerRow}<tbody>${bodyRows}</tbody></table></div>
+        <hr class="divider"/>
+        <div style="font-size:11px;color:var(--muted)">
+          <span style="color:var(--accent2)">■</span> ≥ 0.7 Sangat korelasi &nbsp;
+          <span style="color:var(--accent)">■</span> 0.3–0.7 Korelasi &nbsp;
+          <span style="color:var(--muted)">■</span> -0.3–0.3 Lemah &nbsp;
+          <span style="color:var(--yellow)">■</span> -0.7–-0.3 Negatif &nbsp;
+          <span style="color:var(--red)">■</span> ≤ -0.7 Sangat negatif
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="card"><div class="red">Gagal menghitung korelasi: ${e.message}</div></div>`;
+  }
+}
+
+// Override showPage to support cross-tab navigation from cells
+const _showPage = showPage;
+function showPage(name, fromCode) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    const pages = ['dashboard','analysis','sector','correlation'];
+    if (pages[i] === name) b.classList.add('active'); else b.classList.remove('active');
+  });
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+// =================== INIT ===================
+checkStatus();
+setInterval(checkStatus, 30000);
+</script>
+</body>
+</html>

@@ -779,6 +779,9 @@ try {
   console.warn("⚠️ Could not load swagger.json. API Docs not available.");
 }
 
+// Dashboard UI
+app.use(express.static(path.join(__dirname, "public")));
+
 // Stockbit API base client dengan error handling & retry
 const apiProxy = axios.create({
   baseURL: "https://exodus.stockbit.com",
