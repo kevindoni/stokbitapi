@@ -709,7 +709,18 @@ try {
   /* ignore */
 }
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        imgSrc: ["'self'", "data:"],
+      },
+    },
+  }),
+);
 
 app.use((req, res, next) => {
   runtimeMetrics.requestCount += 1;
@@ -3988,7 +3999,7 @@ app.use("/proxy", proxyLimiter, async (req, res) => {
 
 // ==================== ROOT ====================
 
-app.get("/", (req, res) => {
+app.get("/api/status", (req, res) => {
   const info = stockbitToken ? decodeToken(stockbitToken) : null;
   res.send({
     status: "ok",
