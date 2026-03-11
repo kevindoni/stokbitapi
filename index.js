@@ -717,6 +717,7 @@ app.use(
         scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
         imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
       },
     },
   }),
@@ -743,6 +744,11 @@ const authLimiter = rateLimit({
   max: Number(process.env.RATE_LIMIT_AUTH_MAX || 30),
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) =>
+    req.method === "GET" &&
+    ["/auth/status", "/auth/token-info", "/auth/securities/status"].some(
+      (endpoint) => req.originalUrl.startsWith(endpoint),
+    ),
   message: {
     type: "RateLimitExceeded",
     message: "Too many auth requests. Try again later.",
@@ -756,10 +762,6 @@ const proxyLimiter = rateLimit({
   legacyHeaders: false,
   message: { type: "RateLimitExceeded", message: "Proxy rate limit exceeded." },
 });
-
-app.use(cors());
-app.use(express.json());
-app.use(globalLimiter);
 
 app.param("symbol", validateSymbolParam);
 

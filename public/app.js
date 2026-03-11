@@ -3,6 +3,8 @@ const pageNames = ["dashboard", "analysis", "sector", "correlation"];
 const WATCHLIST_KEY = "stokbitapi.watchlist";
 const DEFAULT_WATCHLIST = ["BBCA", "BBRI", "TLKM", "ASII"];
 let reqChart = null;
+let latestLq45 = null;
+let latestBanking = null;
 
 function getWatchlist() {
   try {
@@ -122,10 +124,14 @@ async function fetchMarketPulse() {
     '<div class="loading"><span class="spinner"></span>Mengambil market pulse...</div>';
 
   try {
-    const [lq45, banking] = await Promise.all([
-      fetch(`${API}/analysis/sector-heatmap/lq45`).then(safeJson),
-      fetch(`${API}/analysis/sector-heatmap/bank`).then(safeJson),
-    ]);
+    const lq45 =
+      latestLq45 || (await apiGet(`/analysis/sector-heatmap/lq45`, 1));
+    const banking =
+      latestBanking || (await apiGet(`/analysis/sector-heatmap/bank`, 1));
+
+    latestLq45 = lq45;
+    latestBanking = banking;
+
     const picks = [
       ...(lq45.heatmap || []).slice(0, 4),
       ...(banking.heatmap || []).slice(0, 2),
@@ -156,7 +162,7 @@ async function fetchMarketPulse() {
       })
       .join("");
   } catch (error) {
-    container.innerHTML = `<div class="red">Gagal memuat market pulse: ${error.message}</div>`;
+    container.innerHTML = `<div class="red">Gagal memuat market pulse: ${humanizeError(error)}</div>`;
   }
 }
 
@@ -287,9 +293,6 @@ async function checkStatus() {
     document.getElementById("server-status").textContent = "Live";
     renderStatCards(health, metrics, auth);
     renderMetricsChart(metrics);
-    fetchTopIdeas();
-    fetchMarketPulse();
-    renderWatchlist();
   } catch (error) {
     document.getElementById("server-status").textContent = "Offline";
   }
@@ -301,6 +304,7 @@ async function fetchTopIdeas() {
 
   try {
     const sector = await apiGet(`/analysis/sector-heatmap/lq45`, 1);
+    latestLq45 = sector;
     const picks = (sector.heatmap || []).slice(0, 6);
 
     if (!picks.length) {
@@ -309,45 +313,32 @@ async function fetchTopIdeas() {
       return;
     }
 
-    const rows = await Promise.all(
-      picks.map(async (stock) => {
-        const symbol = stock.symbol;
-        const [tech, fund] = await Promise.all([
-          fetch(`${API}/analysis/technicals/${symbol}`)
-            .then((r) => r.json())
-            .catch(() => ({})),
-          fetch(`${API}/analysis/fundamentals/${symbol}`)
-            .then((r) => r.json())
-            .catch(() => ({})),
-        ]);
+    const rows = picks.map((stock) => {
+      const symbol = stock.symbol;
+      const price = Number(stock.price || 0);
+      const rsi = stock.RSI ? Number(stock.RSI) : null;
+      const macd = stock.MACD_Trend || "-";
+      const ema = stock.EMA_Trend || "-";
+      const chg = Number(stock.change_pct || 0);
 
-        const price = Number(tech.price || stock.price || 0);
-        const rsi = tech?.indicators?.RSI_14
-          ? Number(tech.indicators.RSI_14)
-          : null;
-        const macd = tech?.indicators?.MACD_Trend || "-";
-        const ema = tech?.indicators?.EMA_Trend || "-";
-        const chg = Number(stock.change_pct || 0);
+      const rec = recommendationFromSignals({
+        rsi,
+        macdTrend: macd,
+        emaTrend: ema,
+        changePct: chg,
+      });
+      const targets = buildTargets(price, rec.bias);
 
-        const rec = recommendationFromSignals({
-          rsi,
-          macdTrend: macd,
-          emaTrend: ema,
-          changePct: chg,
-        });
-        const targets = buildTargets(price, rec.bias);
-
-        return {
-          symbol,
-          name: fund.company_name || stock.name || symbol,
-          price,
-          change: chg,
-          rsi,
-          rec,
-          targets,
-        };
-      }),
-    );
+      return {
+        symbol,
+        name: stock.name || symbol,
+        price,
+        change: chg,
+        rsi,
+        rec,
+        targets,
+      };
+    });
 
     container.innerHTML = rows
       .map((row) => {
@@ -876,6 +867,11 @@ function bindEvents() {
 
 bindEvents();
 checkStatus();
-setInterval(checkStatus, 30000);
-setInterval(fetchTopIdeas, 120000);
-setInterval(fetchMarketPulse, 120000);
+fetchTopIdeas();
+setTimeout(fetchMarketPulse, 2500);
+setTimeout(renderWatchlist, 1200);
+
+setInterval(checkStatus, 45000);
+setInterval(fetchTopIdeas, 180000);
+setInterval(fetchMarketPulse, 210000);
+setInterval(renderWatchlist, 180000);
