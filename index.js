@@ -713,11 +713,6 @@ app.use(helmet());
 
 app.use((req, res, next) => {
   runtimeMetrics.requestCount += 1;
-  const start = Date.now();
-  res.on("finish", () => {
-    const durationMs = Date.now() - start;
-    res.setHeader("X-Response-Time-Ms", String(durationMs));
-  });
   next();
 });
 

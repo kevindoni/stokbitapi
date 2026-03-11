@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 
 const { spawn } = require("child_process");
+const http = require("http");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+
+// Use a dedicated agent with keepAlive:false to avoid ECONNRESET from
+// reusing the TCP connection that was established during the readiness poll.
+const noKeepaliveAgent = new http.Agent({ keepAlive: false });
 
 async function runTests() {
   console.log("⏳ Starting test runner...\n");
@@ -39,6 +44,7 @@ async function runTests() {
     process.exit(1);
   }
 
+  let exitCode = 0;
   try {
     // Run the actual test
     console.log(
@@ -134,6 +140,7 @@ async function runTests() {
         await axios.get(BASE + t.u, {
           headers: t.h || {},
           timeout: t.timeout || 12000,
+          httpAgent: noKeepaliveAgent,
         });
         res += "✅ PASS : " + t.n + "\n";
         p++;
@@ -179,12 +186,13 @@ async function runTests() {
     fs.writeFileSync(path.join(__dirname, "test_results.txt"), res);
     console.log(res);
 
-    // Exit with 0 if all pass, 1 if any fail
-    process.exit(f > 0 ? 1 : 0);
+    exitCode = f > 0 ? 1 : 0;
   } finally {
-    // Clean up server
+    // Clean up server — must be outside process.exit() to actually run
     server.kill();
   }
+
+  process.exit(exitCode);
 }
 
 runTests().catch((err) => {
