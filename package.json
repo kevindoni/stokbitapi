@@ -1,0 +1,32 @@
+{
+  "name": "stokbitapi",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "test": "node test-runner.js"
+  },
+  "keywords": [],
+  "author": "kevindoni",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@sentry/node": "^10.43.0",
+    "axios": "^1.13.6",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^4.22.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "puppeteer": "^24.38.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "swagger-ui-express": "^5.0.1",
+    "technicalindicators": "^3.1.0",
+    "yahoo-finance2": "^3.13.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

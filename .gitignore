@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+.credentials.json
+securities_token.json
+token.json
+test_results.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

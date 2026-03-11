@@ -1,0 +1,39 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy webhook
+        if: ${{ secrets.DEPLOY_WEBHOOK_URL != '' }}
+        run: curl -fsSL -X POST "${{ secrets.DEPLOY_WEBHOOK_URL }}"
+
+      - name: Skip deploy when webhook is missing
+        if: ${{ secrets.DEPLOY_WEBHOOK_URL == '' }}
+        run: echo "DEPLOY_WEBHOOK_URL is not configured. Skipping deploy."

@@ -1,0 +1,1153 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Stockbit Gateway API",
+        "description": "Local developer wrapper for the Stockbit API.\n\n## Architecture\n- **Main Token** (v1) → `exodus.stockbit.com` — Stock data, orderbook, stream, user profile\n- **Securities Token** (v2) → `carina.stockbit.com` — Portfolio, order-trade, trading features\n\n## Quick Start\n1. Run `node capture_token.js` to auto-capture both tokens\n2. Or set tokens manually via `/auth/set-token` and `/auth/securities/set-token`\n3. Use `/proxy/...` endpoints to access Stockbit data\n\n## Verified Endpoints\nAll proxy endpoints have been tested against live Stockbit servers on 10 Mar 2026. Only verified-working endpoints are documented here.",
+        "version": "3.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:3000",
+            "description": "Local Dev"
+        }
+    ],
+    "tags": [
+        {
+            "name": "Auth - Main",
+            "description": "Main Stockbit Token Management (exodus)"
+        },
+        {
+            "name": "Auth - Securities",
+            "description": "Securities/Trading Token Management (carina)"
+        },
+        {
+            "name": "Stock Info",
+            "description": "Company Profile & Price Data"
+        },
+        {
+            "name": "Market",
+            "description": "Orderbook, Trade Charts"
+        },
+        {
+            "name": "Analysis",
+            "description": "Foreign Flow, Historical Data"
+        },
+        {
+            "name": "Social",
+            "description": "Stream & Community"
+        },
+        {
+            "name": "User",
+            "description": "Profile, Watchlist, Notifications"
+        },
+        {
+            "name": "Trading",
+            "description": "Portfolio, Orders (requires Securities Token)"
+        },
+        {
+            "name": "Analysis (Custom)",
+            "description": "Auto-calculated Technical Analysis, Fundamentals, Company Profile, Foreign Flow, Orderbook Depth, Bandarmology, and Complete All-in-One Report"
+        },
+        {
+            "name": "Ops",
+            "description": "Operational endpoints for health checks and runtime metrics"
+        }
+    ],
+    "paths": {
+        "/health": {
+            "get": {
+                "tags": [
+                    "Ops"
+                ],
+                "summary": "Service health check",
+                "description": "Returns API process health and uptime for load balancer/liveness checks.",
+                "responses": {
+                    "200": {
+                        "description": "Service is healthy"
+                    }
+                }
+            }
+        },
+        "/metrics": {
+            "get": {
+                "tags": [
+                    "Ops"
+                ],
+                "summary": "Runtime metrics",
+                "description": "Returns request/error counters, cache size, and uptime.",
+                "responses": {
+                    "200": {
+                        "description": "Runtime metrics snapshot"
+                    }
+                }
+            }
+        },
+        "/analysis/technicals/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Full Technical Analysis (Stockbro Clone)",
+                "description": "Custom API that retrieves Stockbit's raw 1-year historical OHLCV data and automatically calculates MACD, RSI (14), EMA (20, 50), and Classic Pivot Points (Support/Resistance).",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Technical indicators and Pivot Points"
+                    },
+                    "400": {
+                        "description": "Not enough historical data"
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "tags": [
+                    "Auth - Main"
+                ],
+                "summary": "Login (v6 Mobile API)",
+                "description": "Login via Stockbit mobile API. Bypasses reCAPTCHA. May require 2FA device approval.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "username",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "username": {
+                                        "type": "string",
+                                        "example": "user@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "example": "password123"
+                                    },
+                                    "player_id": {
+                                        "type": "string",
+                                        "example": ""
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login success or 2FA required"
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    }
+                }
+            }
+        },
+        "/auth/set-token": {
+            "post": {
+                "tags": [
+                    "Auth - Main"
+                ],
+                "summary": "Set Main Token Manually",
+                "description": "Set Bearer token from browser DevTools → Network → Authorization header.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "example": "eyJhbGciOi..."
+                                    },
+                                    "refresh_token": {
+                                        "type": "string",
+                                        "example": "eyJhbGciOi..."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Token set successfully"
+                    }
+                }
+            }
+        },
+        "/auth/status": {
+            "get": {
+                "tags": [
+                    "Auth - Main"
+                ],
+                "summary": "Main Token Status",
+                "description": "Check main token validity: user, email, UID, expiry, auto-refresh status.",
+                "responses": {
+                    "200": {
+                        "description": "Token info",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "loaded": {
+                                            "type": "boolean"
+                                        },
+                                        "user": {
+                                            "type": "string",
+                                            "example": "kevindoni17"
+                                        },
+                                        "email": {
+                                            "type": "string"
+                                        },
+                                        "uid": {
+                                            "type": "integer"
+                                        },
+                                        "isExpired": {
+                                            "type": "boolean"
+                                        },
+                                        "expiresAt": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "tags": [
+                    "Auth - Main"
+                ],
+                "summary": "Force Token Refresh",
+                "description": "Force refresh using stored refresh token or saved credentials. Auto-refresh runs automatically 10 min before expiry.",
+                "responses": {
+                    "200": {
+                        "description": "Token refreshed"
+                    },
+                    "400": {
+                        "description": "No refresh token or credentials"
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "tags": [
+                    "Auth - Main"
+                ],
+                "summary": "Logout",
+                "description": "Clear all tokens (main + securities) and stored credentials.",
+                "responses": {
+                    "200": {
+                        "description": "Logged out"
+                    }
+                }
+            }
+        },
+        "/proxy/order-trade/trade-book/chart": {
+            "get": {
+                "tags": [
+                    "Trading & Portfolio"
+                ],
+                "summary": "Trade Distribution Chart",
+                "description": "Volume and frequency distribution per price/time. Requires token with trading context (ACN).",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "query",
+                        "description": "Stock symbol (e.g. BBCA)",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "time_interval",
+                        "in": "query",
+                        "description": "Time interval (e.g. 1D)",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Trade distribution chart data"
+                    },
+                    "401": {
+                        "description": "Unauthorized. Needs Securities Token."
+                    }
+                }
+            }
+        },
+        "/auth/securities/login": {
+            "post": {
+                "tags": [
+                    "Auth - Securities"
+                ],
+                "summary": "Securities Login (PIN)",
+                "description": "Login to Stockbit Securities with your trading PIN.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "pin",
+                                    "login_token"
+                                ],
+                                "properties": {
+                                    "pin": {
+                                        "type": "string",
+                                        "example": "060696"
+                                    },
+                                    "login_token": {
+                                        "type": "string",
+                                        "example": "from_browser_devtools"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Securities token obtained"
+                    },
+                    "400": {
+                        "description": "Missing pin or login_token"
+                    }
+                }
+            }
+        },
+        "/auth/securities/set-token": {
+            "post": {
+                "tags": [
+                    "Auth - Securities"
+                ],
+                "summary": "Set Securities Token Manually",
+                "description": "Set the Securities (carina) JWT token manually.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "token"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "type": "string",
+                                        "example": "eyJhbGciOi..."
+                                    },
+                                    "refresh_token": {
+                                        "type": "string",
+                                        "example": ""
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Securities token set"
+                    }
+                }
+            }
+        },
+        "/auth/securities/status": {
+            "get": {
+                "tags": [
+                    "Auth - Securities"
+                ],
+                "summary": "Securities Token Status",
+                "description": "Check Securities token validity, account number (ACN), and expiry.",
+                "responses": {
+                    "200": {
+                        "description": "Securities token info"
+                    }
+                }
+            }
+        },
+        "/proxy/emitten/{symbol}/info": {
+            "get": {
+                "tags": [
+                    "Stock Info"
+                ],
+                "summary": "Company Info & Price",
+                "description": "Get company details: current price, change, volume, bid/offer, sector, indices, followers count.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA",
+                        "description": "Stock ticker symbol (IDX)"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Company info with live price data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "average": {
+                                                    "type": "string",
+                                                    "example": "200640504.00"
+                                                },
+                                                "change": {
+                                                    "type": "string",
+                                                    "example": "+100.00"
+                                                },
+                                                "country": {
+                                                    "type": "string",
+                                                    "example": "ID"
+                                                },
+                                                "exchange": {
+                                                    "type": "string",
+                                                    "example": "IDX"
+                                                },
+                                                "followers": {
+                                                    "type": "integer",
+                                                    "example": 2728922
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/emitten/{symbol}/profile": {
+            "get": {
+                "tags": [
+                    "Stock Info"
+                ],
+                "summary": "Company Profile",
+                "description": "Get detailed company profile: description, sector, industry, market cap, address, directors, commissioners.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Company profile data"
+                    }
+                }
+            }
+        },
+        "/proxy/company-price-feed/v2/orderbook/companies/{symbol}": {
+            "get": {
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Orderbook (Bid/Offer)",
+                "description": "Full multi-level orderbook with bid/ask prices, volumes, and queue numbers. Real-time market data.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Live orderbook data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "average": {
+                                                    "type": "integer"
+                                                },
+                                                "bid": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "offer": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/order-trade/trade-book/chart": {
+            "get": {
+                "tags": [
+                    "Market"
+                ],
+                "summary": "Trade Book Chart",
+                "description": "Volume and frequency distribution per price/time. Requires token with trading context (ACN).",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    },
+                    {
+                        "name": "time_interval",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "1D",
+                                "1W",
+                                "1M",
+                                "3M",
+                                "6M",
+                                "1Y"
+                            ]
+                        },
+                        "example": "1D"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Trade distribution chart data"
+                    },
+                    "500": {
+                        "description": "Server error (may occur if no trades exist)"
+                    }
+                }
+            }
+        },
+        "/analysis/yfinance/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Deep Fundamentals & KeyStats (Yahoo Finance)",
+                "description": "Fetches comprehensive deep fundamental data including Valuation (P/E, EV), Profitability (ROA, ROE, Margins), Dividends, and the Latest Income Statement & Balance Sheet using Yahoo Finance API.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                }
+            }
+        },
+        "/proxy/company-price-feed/historical/summary/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis"
+                ],
+                "summary": "Historical Summary",
+                "description": "Daily historical price data: date, open, high, low, close, volume, value, frequency, change.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historical OHLCV data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Successfully get the historical summary"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "result": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "date": {
+                                                                "type": "string",
+                                                                "example": "2026-03-10"
+                                                            },
+                                                            "close": {
+                                                                "type": "integer",
+                                                                "example": 6975
+                                                            },
+                                                            "volume": {
+                                                                "type": "integer"
+                                                            },
+                                                            "value": {
+                                                                "type": "integer"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/findata-view/foreign-domestic/v1/chart-data/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis"
+                ],
+                "summary": "Foreign vs Domestic Flow",
+                "description": "Foreign and domestic investor buy/sell breakdown with net flow. Includes date range and formatted values.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Foreign/domestic transaction flow data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "summary": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "date_range": {
+                                                            "type": "string",
+                                                            "example": "10 Mar 2026"
+                                                        },
+                                                        "foreign_buy": {
+                                                            "type": "object"
+                                                        },
+                                                        "foreign_sell": {
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/stream/v3/symbol/{symbol}": {
+            "get": {
+                "tags": [
+                    "Social"
+                ],
+                "summary": "Symbol Stream",
+                "description": "Community posts and discussions about a specific stock symbol. Returns up to 30 posts with content, likes, and user info.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "BBCA"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stream posts from community",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "30 stream post(s) retrieved"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "stream": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/watchlist": {
+            "get": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "My Watchlists",
+                "description": "Get all user-defined watchlists with items, including default watchlist.",
+                "responses": {
+                    "200": {
+                        "description": "List of watchlists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "All Your Saved Watchlist"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "watchlist_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "is_default": {
+                                                        "type": "boolean"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/user/profile": {
+            "get": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "My Profile",
+                "description": "Get authenticated user's profile: ID, join date, follower/following counts, reputation, idea count.",
+                "responses": {
+                    "200": {
+                        "description": "User profile data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Profile found"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 5480349
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "statistics": {
+                                                    "type": "object"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/notification/count/unread": {
+            "get": {
+                "tags": [
+                    "User"
+                ],
+                "summary": "Unread Notifications",
+                "description": "Count of unread notifications for the authenticated user.",
+                "responses": {
+                    "200": {
+                        "description": "Unread notification count",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "unread": {
+                                                    "type": "integer",
+                                                    "example": 84
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/proxy/portfolio/v2/summary": {
+            "get": {
+                "tags": [
+                    "Trading"
+                ],
+                "summary": "Portfolio Summary",
+                "description": "Get trading portfolio summary: balance, invested amount, equity, P&L, credit limit. Requires Securities Token.",
+                "responses": {
+                    "200": {
+                        "description": "Portfolio summary with balance and equity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "aggregated_portfolio_summary": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "trading": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "balance": {
+                                                                    "type": "number",
+                                                                    "example": 6970.51
+                                                                }
+                                                            }
+                                                        },
+                                                        "amount": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "invested": {
+                                                                    "type": "number"
+                                                                },
+                                                                "credit_limit": {
+                                                                    "type": "number"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Securities token expired or missing"
+                    }
+                }
+            }
+        },
+        "/proxy/order/v2/list": {
+            "get": {
+                "tags": [
+                    "Trading"
+                ],
+                "summary": "Order List",
+                "description": "Get list of active trading orders. Requires Securities Token.",
+                "responses": {
+                    "200": {
+                        "description": "Active order list"
+                    },
+                    "401": {
+                        "description": "Securities token expired or missing"
+                    }
+                }
+            }
+        },
+        "/analysis/technicals/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Technical Analysis (MACD, RSI, EMA, Pivot)",
+                "description": "Calculates MACD (12,26,9), RSI (14), EMA 20/50, and Classic Pivot Points (S1-S3, R1-R3) from 60 days of historical OHLCV data. Uses the `technicalindicators` NPM library internally.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Technical indicators with trend signals"
+                    }
+                }
+            }
+        },
+        "/analysis/fundamentals/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Fundamental Analysis (Market Summary, 52W, Volatility)",
+                "description": "Returns company name, sector, sub-sector, price change, 52-week high/low, volatility, average daily volume/value, sentiment, trading info, corporate actions, and index memberships. Fetches 22 pages of historical data for accurate 52W calculations.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fundamental data with market summary"
+                    }
+                }
+            }
+        },
+        "/analysis/company/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Company Profile (Background, Shareholders, Executives)",
+                "description": "Returns company background, history, address, shareholders with percentages, key executives (commissioners & directors), subsidiaries, listing information, secretary, and badges.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detailed company profile"
+                    }
+                }
+            }
+        },
+        "/analysis/foreign-flow/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Foreign Flow Analysis (Buy/Sell, Streak, Sentiment)",
+                "description": "Returns foreign buy/sell summary, net foreign sentiment (🟢/🔴), consecutive days streak analysis, daily foreign flow breakdown with cumulative totals, and chart data (value/volume/frequency).",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Foreign flow analysis with sentiment"
+                    }
+                }
+            }
+        },
+        "/analysis/orderbook/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Orderbook Depth Analysis (Buy/Sell Pressure, Spread)",
+                "description": "Analyzes real-time orderbook depth: buy/sell pressure ratio, bid-ask spread, top 5 bid/offer levels, accumulation zones (significant bid clusters >5%), and distribution zones (significant offer clusters >5%).",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Orderbook depth analysis with pressure signals"
+                    }
+                }
+            }
+        },
+        "/analysis/bandarmology/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "Bandarmology / Volume Anomaly Detection",
+                "description": "Advanced volume analysis: today vs 20-day average ratio, volume anomaly detection (>2x average), accumulation/distribution scoring based on foreign flow + price movement, price-volume divergence detection, and 20-day money flow analysis (inflow vs outflow).",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bandarmology analysis with volume/flow signals"
+                    }
+                }
+            }
+        },
+        "/analysis/complete/{symbol}": {
+            "get": {
+                "tags": [
+                    "Analysis (Custom)"
+                ],
+                "summary": "🏆 Complete All-in-One Analysis",
+                "description": "Aggregates ALL 6 analysis endpoints into a single comprehensive response: Technicals + Fundamentals + Company + Foreign Flow + Orderbook + Bandarmology. Uses parallel fetching for maximum speed.",
+                "parameters": [
+                    {
+                        "name": "symbol",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "BBCA"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Complete analysis combining all 6 sub-reports"
+                    }
+                }
+            }
+        }
+    }
+}
