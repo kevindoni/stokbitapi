@@ -4,12 +4,10 @@ services:
     runtime: docker
     plan: free
     autoDeploy: true
-    healthCheckPath: /auth/status
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
       - key: RATE_LIMIT_GLOBAL_MAX
         value: 300
       - key: RATE_LIMIT_AUTH_MAX
