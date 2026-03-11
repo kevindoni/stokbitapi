@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: stokbitapi
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /auth/status
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: RATE_LIMIT_GLOBAL_MAX
+        value: 300
+      - key: RATE_LIMIT_AUTH_MAX
+        value: 30
+      - key: RATE_LIMIT_PROXY_MAX
+        value: 180
+      - key: MAX_HEAVY_IN_FLIGHT
+        value: 8
+      - key: CACHE_TTL_SHORT_MS
+        value: 30000
+      - key: CACHE_TTL_HEAVY_MS
+        value: 90000
