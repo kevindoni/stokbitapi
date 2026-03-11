@@ -1,8 +1,0 @@
-node_modules
-npm-debug.log
-.git
-.github
-.env
-.env.*
-*.log
-test_results.txt
