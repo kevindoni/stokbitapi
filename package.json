@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "test": "node test-runner.js",
-    "test:live": "node live-smoke.js"
+    "test": "node test-runner.js"
   },
   "keywords": [],
   "author": "kevindoni",
