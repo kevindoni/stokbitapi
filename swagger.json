@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Stockbit Gateway API",
-        "description": "Local developer wrapper for the Stockbit API.\n\n## Architecture\n- **Main Token** (v1) → `exodus.stockbit.com` — Stock data, orderbook, stream, user profile\n- **Securities Token** (v2) → `carina.stockbit.com` — Portfolio, order-trade, trading features\n\n## Quick Start\n1. Run `node capture_token.js` to auto-capture both tokens\n2. Or set tokens manually via `/auth/set-token` and `/auth/securities/set-token`\n3. Use `/proxy/...` endpoints to access Stockbit data\n\n## Verified Endpoints\nAll proxy endpoints have been tested against live Stockbit servers on 10 Mar 2026. Only verified-working endpoints are documented here.",
+        "description": "Local developer wrapper for the Stockbit API.",
         "version": "3.0.0"
     },
     "servers": [
